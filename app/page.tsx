@@ -13,6 +13,8 @@ type Comment = {
   likeCount?: number;
   score?: number;
   fetchedAt?: string;
+  fetchedAtUtc?: string;
+  fetchedAtIst?: string;
   crawled_at?: string;
   publishedAt?: string;
 };
@@ -92,7 +94,11 @@ export default function HomePage() {
                     <td>{comment.databaseName ?? comment.database ?? 'health'}</td>
                     <td>{comment.authorName ?? comment.author ?? 'Unknown'}</td>
                     <td>{comment.text ?? comment.commentText ?? ''}</td>
-                    <td>{formatIst(comment.fetchedAt ?? comment.crawled_at ?? comment.publishedAt)}</td>
+                    <td>
+                      {formatCollectedAt(
+                        comment.fetchedAtIst ?? comment.fetchedAtUtc ?? comment.fetchedAt ?? comment.crawled_at
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -104,9 +110,13 @@ export default function HomePage() {
   );
 }
 
-function formatIst(value?: string) {
+function formatCollectedAt(value?: string) {
   if (!value) {
     return '-';
+  }
+
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+    return value;
   }
 
   return new Intl.DateTimeFormat('en-IN', {

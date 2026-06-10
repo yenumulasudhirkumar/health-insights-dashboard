@@ -16,7 +16,7 @@ export async function GET() {
     const yesterdayIst = new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', {
       timeZone: 'Asia/Kolkata',
     });
-    const upstream = new URL('api/comments/recent', normalizedBaseUrl);
+    const upstream = new URL('api/comments/relevant-questions', normalizedBaseUrl);
     upstream.searchParams.set('date', yesterdayIst);
     upstream.searchParams.set('database', 'both');
     upstream.searchParams.set('limit', '50');
@@ -36,7 +36,7 @@ export async function GET() {
     }
 
     const payload = await response.json();
-    return NextResponse.json({ data: payload.data ?? payload });
+    return NextResponse.json({ data: payload.items ?? payload.data?.items ?? [] });
   } catch (error) {
     return NextResponse.json(
       {

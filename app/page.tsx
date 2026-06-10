@@ -54,9 +54,9 @@ export default function HomePage() {
       <section className="hero">
         <div>
           <p className="eyebrow">Health insights</p>
-          <h1>Fresh health discussion signals</h1>
+          <h1>Relevant health questions</h1>
           <p className="description">
-            Review the newest high-signal health questions, myths, experiences, and support patterns from recent discussion data.
+            Review recent health questions after filtering short posts, spam, rants, and non-health chatter.
           </p>
         </div>
         <button className="refreshButton" onClick={fetchComments} disabled={loading}>
@@ -82,7 +82,7 @@ export default function HomePage() {
               {comments.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="emptyRow">
-                    {loading ? 'Loading insights...' : 'No insights found for the last day.'}
+                    {loading ? 'Loading insights...' : 'No relevant health questions found for the last day.'}
                   </td>
                 </tr>
               ) : (

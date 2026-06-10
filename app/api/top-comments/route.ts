@@ -13,7 +13,11 @@ export async function GET() {
 
   try {
     const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    const upstream = new URL('api/comments/yesterday', normalizedBaseUrl);
+    const yesterdayIst = new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', {
+      timeZone: 'Asia/Kolkata',
+    });
+    const upstream = new URL('api/comments/recent', normalizedBaseUrl);
+    upstream.searchParams.set('date', yesterdayIst);
     upstream.searchParams.set('database', 'both');
     upstream.searchParams.set('limit', '50');
 

@@ -18,7 +18,7 @@ export async function GET() {
     });
     const upstream = new URL('api/comments/relevant-questions', normalizedBaseUrl);
     upstream.searchParams.set('date', yesterdayIst);
-    upstream.searchParams.set('database', 'both');
+    upstream.searchParams.set('database', 'health');
     upstream.searchParams.set('limit', '50');
 
     const response = await fetch(upstream, {

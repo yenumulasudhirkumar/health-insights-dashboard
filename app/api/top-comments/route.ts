@@ -12,7 +12,8 @@ export async function GET() {
   }
 
   try {
-    const upstream = new URL('/api/comments/yesterday', baseUrl);
+    const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    const upstream = new URL('api/comments/yesterday', normalizedBaseUrl);
     upstream.searchParams.set('database', 'both');
     upstream.searchParams.set('limit', '50');
 

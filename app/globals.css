@@ -84,7 +84,8 @@ h1 {
   text-transform: uppercase;
 }
 
-.dateField input {
+.dateField input,
+.dateField select {
   border: 1px solid #d1d5db;
   border-radius: 12px;
   background: white;

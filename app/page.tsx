@@ -19,18 +19,22 @@ type Comment = {
   publishedAt?: string;
 };
 
+type DatabaseFilter = 'both' | 'main' | 'health';
+
 export default function HomePage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => getIstDateOffset(-1));
+  const [selectedDatabase, setSelectedDatabase] = useState<DatabaseFilter>('both');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchComments = async (date = selectedDate) => {
+  const fetchComments = async (date = selectedDate, database = selectedDatabase) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/top-comments?date=${encodeURIComponent(date)}`);
+      const params = new URLSearchParams({ date, database });
+      const response = await fetch(`/api/top-comments?${params.toString()}`);
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
       }
@@ -71,9 +75,24 @@ export default function HomePage() {
               onChange={(event) => {
                 const nextDate = event.target.value;
                 setSelectedDate(nextDate);
-                fetchComments(nextDate);
+                fetchComments(nextDate, selectedDatabase);
               }}
             />
+          </label>
+          <label className="dateField">
+            <span>Source</span>
+            <select
+              value={selectedDatabase}
+              onChange={(event) => {
+                const nextDatabase = event.target.value as DatabaseFilter;
+                setSelectedDatabase(nextDatabase);
+                fetchComments(selectedDate, nextDatabase);
+              }}
+            >
+              <option value="both">Both DBs</option>
+              <option value="main">YouTube</option>
+              <option value="health">Influencers</option>
+            </select>
           </label>
           <div className="quickActions">
             <button type="button" onClick={() => chooseDate(getIstDateOffset(0))} disabled={loading}>
@@ -134,7 +153,7 @@ export default function HomePage() {
 
   function chooseDate(date: string) {
     setSelectedDate(date);
-    fetchComments(date);
+    fetchComments(date, selectedDatabase);
   }
 }
 

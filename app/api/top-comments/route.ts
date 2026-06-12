@@ -17,14 +17,19 @@ export async function GET(request: NextRequest) {
       timeZone: 'Asia/Kolkata',
     });
     const requestedDate = request.nextUrl.searchParams.get('date') ?? fallbackDateIst;
+    const requestedDatabase = request.nextUrl.searchParams.get('database') ?? 'both';
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
       return NextResponse.json({ error: 'Date must use YYYY-MM-DD format.' }, { status: 400 });
     }
 
+    if (!['main', 'health', 'both'].includes(requestedDatabase)) {
+      return NextResponse.json({ error: 'Database must be main, health, or both.' }, { status: 400 });
+    }
+
     const upstream = new URL('api/comments/relevant-questions', normalizedBaseUrl);
     upstream.searchParams.set('date', requestedDate);
-    upstream.searchParams.set('database', 'main');
+    upstream.searchParams.set('database', requestedDatabase);
     upstream.searchParams.set('limit', '50');
 
     const response = await fetch(upstream, {

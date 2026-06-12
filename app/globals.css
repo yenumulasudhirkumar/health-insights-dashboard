@@ -66,6 +66,52 @@ h1 {
   color: #4b5563;
 }
 
+.heroControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.dateField {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 10rem;
+  color: #374151;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.dateField input {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: white;
+  color: #111827;
+  padding: 0.78rem 0.9rem;
+}
+
+.quickActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.quickActions button {
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #374151;
+  border-radius: 999px;
+  padding: 0.8rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quickActions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .refreshButton {
   border: none;
   background: #4f46e5;
@@ -146,5 +192,18 @@ tbody tr:hover {
 
   .refreshButton {
     width: 100%;
+  }
+
+  .heroControls,
+  .dateField {
+    width: 100%;
+  }
+
+  .quickActions {
+    width: 100%;
+  }
+
+  .quickActions button {
+    flex: 1;
   }
 }

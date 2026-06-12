@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const baseUrl = process.env.HEALTH_INSIGHTS_API_BASE_URL;
   const apiKey = process.env.HEALTH_INSIGHTS_API_KEY;
 
@@ -13,11 +13,17 @@ export async function GET() {
 
   try {
     const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    const yesterdayIst = new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', {
+    const fallbackDateIst = new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', {
       timeZone: 'Asia/Kolkata',
     });
+    const requestedDate = request.nextUrl.searchParams.get('date') ?? fallbackDateIst;
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
+      return NextResponse.json({ error: 'Date must use YYYY-MM-DD format.' }, { status: 400 });
+    }
+
     const upstream = new URL('api/comments/relevant-questions', normalizedBaseUrl);
-    upstream.searchParams.set('date', yesterdayIst);
+    upstream.searchParams.set('date', requestedDate);
     upstream.searchParams.set('database', 'main');
     upstream.searchParams.set('limit', '50');
 

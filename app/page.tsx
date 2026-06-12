@@ -6,8 +6,10 @@ type Comment = {
   id?: number | string;
   database?: string;
   databaseName?: string;
+  authorDisplayName?: string;
   author?: string;
   authorName?: string;
+  videoTitle?: string;
   text?: string;
   commentText?: string;
   likeCount?: number;
@@ -118,6 +120,7 @@ export default function HomePage() {
                 <th>Score</th>
                 <th>Source</th>
                 <th>Author</th>
+                <th>Video</th>
                 <th>Text</th>
                 <th>Collected At</th>
               </tr>
@@ -125,7 +128,7 @@ export default function HomePage() {
             <tbody>
               {comments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="emptyRow">
+                  <td colSpan={6} className="emptyRow">
                     {loading ? 'Loading insights...' : `No relevant health questions found for ${selectedDate}.`}
                   </td>
                 </tr>
@@ -134,7 +137,8 @@ export default function HomePage() {
                   <tr key={comment.id ?? index}>
                     <td>{comment.likeCount ?? comment.score ?? 0}</td>
                     <td>{comment.databaseName ?? comment.database ?? 'health'}</td>
-                    <td>{comment.authorName ?? comment.author ?? 'Unknown'}</td>
+                    <td>{comment.authorDisplayName ?? comment.authorName ?? comment.author ?? 'Unknown'}</td>
+                    <td className="videoTitle">{comment.videoTitle ?? '-'}</td>
                     <td>{comment.text ?? comment.commentText ?? ''}</td>
                     <td>
                       {formatCollectedAt(

@@ -19,7 +19,17 @@ A small Next.js dashboard for reviewing fresh health discussion signals from the
 
 ## API
 
-- `GET /api/top-comments` proxies the backend `GET /api/comments/yesterday` endpoint.
+- `GET /api/top-comments?date=YYYY-MM-DD&database=both&language=all` proxies the backend relevant-health-question endpoint.
+- `POST /api/top-comments` proxies selected comments to the backend curation endpoint.
+
+The dashboard supports language filtering for:
+
+- all
+- English
+- Hindi
+- Telugu
+- mixed
+- unknown
 
 ## Vercel deployment
 

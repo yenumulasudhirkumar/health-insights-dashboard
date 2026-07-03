@@ -30,6 +30,82 @@ type Comment = {
 type DatabaseFilter = 'both' | 'main' | 'health';
 type LanguageFilter = 'all' | 'english' | 'hindi' | 'telugu' | 'mixed' | 'unknown';
 type FeedFilter = 'questions' | 'signals';
+type ReviewForm = {
+  symptoms: string[];
+  symptomInput: string;
+  possibleConditions: string[];
+  conditionInput: string;
+  medicalSpecialty: string;
+  urgencyLevel: string;
+  supportingTags: string[];
+  causalityConfidence: string;
+  reviewNote: string;
+  quality: string;
+};
+
+const SYMPTOM_OPTIONS = [
+  'pain',
+  'burning',
+  'nausea',
+  'dizziness',
+  'fatigue',
+  'weakness',
+  'hair fall',
+  'chest pain',
+  'infection',
+  'kidney stones',
+];
+
+const CONDITION_OPTIONS = [
+  'acid reflux',
+  'diabetes',
+  'hypertension',
+  'thyroid disorder',
+  'pcos',
+  'migraine',
+  'kidney stone',
+  'drug side effect',
+  'fungal infection',
+  'low bone density',
+];
+
+const SPECIALTY_OPTIONS = [
+  'primary_care',
+  'gastroenterology',
+  'endocrinology',
+  'cardiology',
+  'dermatology',
+  'ent',
+  'neurology',
+  'gynecology',
+  'orthopedics',
+  'psychiatry',
+  'pediatrics',
+  'emergency_medicine',
+];
+
+const SUPPORTING_TAGS = [
+  'PATIENT_EXPERIENCE',
+  'HEALTH_QUESTION',
+  'TREATMENT_OUTCOME',
+  'SIDE_EFFECT_OR_WARNING',
+  'MYTH_OR_MISINFORMATION',
+  'LIFESTYLE_OR_HOME_REMEDY',
+  'OTHER',
+];
+
+const DEFAULT_REVIEW_FORM: ReviewForm = {
+  symptoms: [],
+  symptomInput: '',
+  possibleConditions: [],
+  conditionInput: '',
+  medicalSpecialty: 'primary_care',
+  urgencyLevel: 'low',
+  supportingTags: [],
+  causalityConfidence: 'unknown',
+  reviewNote: '',
+  quality: 'medium',
+};
 
 export default function HomePage() {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -40,6 +116,9 @@ export default function HomePage() {
   const [minScore, setMinScore] = useState(6);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [reviewIndex, setReviewIndex] = useState<number | null>(null);
+  const [reviewForm, setReviewForm] = useState<ReviewForm>(DEFAULT_REVIEW_FORM);
+  const [reviewSaving, setReviewSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -218,12 +297,13 @@ export default function HomePage() {
                 comments.map((comment, index) => {
                   const rowKey = getCommentKey(comment, index);
                   return (
-                    <tr key={rowKey}>
+                    <tr key={rowKey} className="reviewableRow" onClick={() => openReview(index)}>
                       <td>
                         <input
                           aria-label="Select comment"
                           type="checkbox"
                           checked={selectedRows.has(rowKey)}
+                          onClick={(event) => event.stopPropagation()}
                           onChange={(event) => toggleRow(rowKey, event.target.checked)}
                         />
                       </td>
@@ -248,6 +328,18 @@ export default function HomePage() {
           </table>
         </div>
       )}
+
+      {reviewIndex !== null && comments[reviewIndex] ? (
+        <ReviewModal
+          comment={comments[reviewIndex]}
+          form={reviewForm}
+          saving={reviewSaving}
+          onChange={setReviewForm}
+          onCancel={closeReview}
+          onSave={() => saveReview(false)}
+          onSaveNext={() => saveReview(true)}
+        />
+      ) : null}
     </main>
   );
 
@@ -266,6 +358,83 @@ export default function HomePage() {
       }
       return next;
     });
+  }
+
+  function openReview(index: number) {
+    setReviewIndex(index);
+    setReviewForm({
+      ...DEFAULT_REVIEW_FORM,
+      supportingTags: selectedFeed === 'signals' ? ['PATIENT_EXPERIENCE'] : ['HEALTH_QUESTION'],
+    });
+    setSaveStatus(null);
+    setError(null);
+  }
+
+  function closeReview() {
+    setReviewIndex(null);
+    setReviewForm(DEFAULT_REVIEW_FORM);
+    setReviewSaving(false);
+  }
+
+  async function saveReview(moveNext: boolean) {
+    if (reviewIndex === null || !comments[reviewIndex]) {
+      return;
+    }
+
+    const comment = comments[reviewIndex];
+    setReviewSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/reviewed-comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewedBy: 'sudhir',
+          comments: [
+            {
+              databaseName: comment.databaseName ?? comment.database,
+              sourceCommentId: comment.commentId ?? String(comment.id ?? ''),
+              videoId: comment.videoId,
+              videoTitle: comment.videoTitle,
+              channelTitle: comment.channelTitle,
+              commentText: comment.text ?? comment.commentText ?? '',
+              detectedLanguage: comment.detectedLanguage,
+              symptoms: reviewForm.symptoms,
+              possibleConditions: reviewForm.possibleConditions,
+              medicalSpecialty: reviewForm.medicalSpecialty,
+              urgencyLevel: reviewForm.urgencyLevel,
+              supportingTags: reviewForm.supportingTags,
+              causalityConfidence: reviewForm.causalityConfidence,
+              labels: reviewForm.supportingTags,
+              quality: reviewForm.quality,
+              reviewNote: reviewForm.reviewNote,
+            },
+          ],
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok || payload.error) {
+        throw new Error(payload.error ?? `Server responded with ${response.status}`);
+      }
+
+      setSaveStatus('Reviewed comment saved.');
+      if (moveNext) {
+        const nextIndex = reviewIndex + 1;
+        if (nextIndex < comments.length) {
+          openReview(nextIndex);
+        } else {
+          closeReview();
+        }
+      } else {
+        closeReview();
+      }
+    } catch (err) {
+      setError((err as Error).message || 'Unable to save reviewed comment');
+    } finally {
+      setReviewSaving(false);
+    }
   }
 
   async function saveSelectedComments() {
@@ -320,6 +489,260 @@ function formatMatchedRules(groups?: string[]) {
     return '-';
   }
   return groups.map((group) => group.toLowerCase().replace(/_/g, ' ')).join(', ');
+}
+
+function ReviewModal({
+  comment,
+  form,
+  saving,
+  onChange,
+  onCancel,
+  onSave,
+  onSaveNext,
+}: {
+  comment: Comment;
+  form: ReviewForm;
+  saving: boolean;
+  onChange: (form: ReviewForm) => void;
+  onCancel: () => void;
+  onSave: () => void;
+  onSaveNext: () => void;
+}) {
+  const commentText = comment.text ?? comment.commentText ?? '';
+
+  return (
+    <div className="modalBackdrop" role="presentation" onMouseDown={onCancel}>
+      <section className="reviewModal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+        <header className="modalHeader">
+          <div>
+            <p className="eyebrow">Review comment</p>
+            <h2>Structured health review</h2>
+          </div>
+          <button type="button" className="iconButton" onClick={onCancel} aria-label="Close review dialog">
+            ×
+          </button>
+        </header>
+
+        <div className="sourcePanel">
+          <div>
+            <strong>Source</strong>
+            <span>{comment.databaseName ?? comment.database ?? 'unknown'}</span>
+          </div>
+          <div>
+            <strong>Video</strong>
+            <span>{comment.videoTitle ?? '-'}</span>
+          </div>
+          <div>
+            <strong>Channel</strong>
+            <span>{comment.channelTitle ?? '-'}</span>
+          </div>
+          <div>
+            <strong>Comment ID</strong>
+            <span>{comment.commentId ?? comment.id ?? '-'}</span>
+          </div>
+        </div>
+
+        <blockquote className="commentQuote">{commentText}</blockquote>
+
+        <div className="formGrid">
+          <ChipEditor
+            label="Symptoms"
+            options={SYMPTOM_OPTIONS}
+            values={form.symptoms}
+            inputValue={form.symptomInput}
+            onInputChange={(value) => onChange({ ...form, symptomInput: value })}
+            onAdd={(value) =>
+              onChange({ ...form, symptoms: addUnique(form.symptoms, value), symptomInput: '' })
+            }
+            onRemove={(value) => onChange({ ...form, symptoms: form.symptoms.filter((item) => item !== value) })}
+          />
+
+          <ChipEditor
+            label="Possible Conditions"
+            options={CONDITION_OPTIONS}
+            values={form.possibleConditions}
+            inputValue={form.conditionInput}
+            onInputChange={(value) => onChange({ ...form, conditionInput: value })}
+            onAdd={(value) =>
+              onChange({
+                ...form,
+                possibleConditions: addUnique(form.possibleConditions, value),
+                conditionInput: '',
+              })
+            }
+            onRemove={(value) =>
+              onChange({
+                ...form,
+                possibleConditions: form.possibleConditions.filter((item) => item !== value),
+              })
+            }
+          />
+
+          <label className="reviewField">
+            <span>Medical Specialty</span>
+            <select
+              value={form.medicalSpecialty}
+              onChange={(event) => onChange({ ...form, medicalSpecialty: event.target.value })}
+            >
+              {SPECIALTY_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {formatOption(option)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="reviewField">
+            <span>Urgency</span>
+            <select
+              value={form.urgencyLevel}
+              onChange={(event) => onChange({ ...form, urgencyLevel: event.target.value })}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="emergency">Emergency</option>
+            </select>
+          </label>
+
+          <label className="reviewField">
+            <span>Causality Confidence</span>
+            <select
+              value={form.causalityConfidence}
+              onChange={(event) => onChange({ ...form, causalityConfidence: event.target.value })}
+            >
+              <option value="confirmed">Confirmed</option>
+              <option value="likely">Likely</option>
+              <option value="possible">Possible</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </label>
+
+          <label className="reviewField">
+            <span>Quality</span>
+            <select value={form.quality} onChange={(event) => onChange({ ...form, quality: event.target.value })}>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+        </div>
+
+        <fieldset className="tagFieldset">
+          <legend>Supporting Tags</legend>
+          <div className="tagGrid">
+            {SUPPORTING_TAGS.map((tag) => (
+              <label key={tag} className="tagOption">
+                <input
+                  type="checkbox"
+                  checked={form.supportingTags.includes(tag)}
+                  onChange={(event) =>
+                    onChange({
+                      ...form,
+                      supportingTags: event.target.checked
+                        ? addUnique(form.supportingTags, tag)
+                        : form.supportingTags.filter((item) => item !== tag),
+                    })
+                  }
+                />
+                <span>{formatOption(tag)}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="reviewField fullWidth">
+          <span>Review Note</span>
+          <textarea
+            value={form.reviewNote}
+            rows={4}
+            onChange={(event) => onChange({ ...form, reviewNote: event.target.value })}
+          />
+        </label>
+
+        <footer className="modalActions">
+          <button type="button" className="secondaryButton" onClick={onCancel} disabled={saving}>
+            Cancel
+          </button>
+          <button type="button" className="secondaryButton" onClick={onSaveNext} disabled={saving}>
+            Save & Next
+          </button>
+          <button type="button" className="refreshButton" onClick={onSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Review'}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function ChipEditor({
+  label,
+  options,
+  values,
+  inputValue,
+  onInputChange,
+  onAdd,
+  onRemove,
+}: {
+  label: string;
+  options: string[];
+  values: string[];
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onAdd: (value: string) => void;
+  onRemove: (value: string) => void;
+}) {
+  return (
+    <div className="chipEditor">
+      <label className="reviewField">
+        <span>{label}</span>
+        <select defaultValue="" onChange={(event) => event.target.value && onAdd(event.target.value)}>
+          <option value="">Add preset...</option>
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="chipInputRow">
+        <input
+          value={inputValue}
+          placeholder={`Add ${label.toLowerCase()}`}
+          onChange={(event) => onInputChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              onAdd(inputValue);
+            }
+          }}
+        />
+        <button type="button" className="secondaryButton" onClick={() => onAdd(inputValue)}>
+          Add
+        </button>
+      </div>
+      <div className="chipList">
+        {values.map((value) => (
+          <button key={value} type="button" className="chip" onClick={() => onRemove(value)}>
+            {value} ×
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function addUnique(values: string[], value: string) {
+  const normalized = value.trim();
+  if (!normalized || values.includes(normalized)) {
+    return values;
+  }
+  return [...values, normalized];
+}
+
+function formatOption(value: string) {
+  return value.toLowerCase().replace(/_/g, ' ');
 }
 
 function feedLabel(feed: FeedFilter) {

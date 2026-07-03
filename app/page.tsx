@@ -19,6 +19,7 @@ type Comment = {
   detectedLanguage?: string;
   likeCount?: number;
   score?: number;
+  matchedRuleGroups?: string[];
   fetchedAt?: string;
   fetchedAtUtc?: string;
   fetchedAtIst?: string;
@@ -36,6 +37,7 @@ export default function HomePage() {
   const [selectedFeed, setSelectedFeed] = useState<FeedFilter>('questions');
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseFilter>('both');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageFilter>('all');
+  const [minScore, setMinScore] = useState(6);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,14 +47,15 @@ export default function HomePage() {
     date = selectedDate,
     feed = selectedFeed,
     database = selectedDatabase,
-    language = selectedLanguage
+    language = selectedLanguage,
+    score = minScore
   ) => {
     setLoading(true);
     setError(null);
     setSaveStatus(null);
 
     try {
-      const params = new URLSearchParams({ date, feed, database, language });
+      const params = new URLSearchParams({ date, feed, database, language, minScore: String(score) });
       const response = await fetch(`/api/top-comments?${params.toString()}`);
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
@@ -147,6 +150,21 @@ export default function HomePage() {
               <option value="unknown">Unknown</option>
             </select>
           </label>
+          <label className="dateField compactField">
+            <span>Min score</span>
+            <select
+              value={minScore}
+              onChange={(event) => {
+                const nextMinScore = Number(event.target.value);
+                setMinScore(nextMinScore);
+                fetchComments(selectedDate, selectedFeed, selectedDatabase, selectedLanguage, nextMinScore);
+              }}
+            >
+              <option value={4}>4</option>
+              <option value={6}>6</option>
+              <option value={8}>8</option>
+            </select>
+          </label>
           <div className="quickActions">
             <button type="button" onClick={() => chooseDate(getIstDateOffset(0))} disabled={loading}>
               Today
@@ -179,10 +197,12 @@ export default function HomePage() {
               <tr>
                 <th>Select</th>
                 <th>Score</th>
+                <th>Likes</th>
                 <th>Source</th>
                 <th>Language</th>
                 <th>Author</th>
                 <th>Video</th>
+                <th>Matched rules</th>
                 <th>Text</th>
                 <th>Collected At</th>
               </tr>
@@ -190,7 +210,7 @@ export default function HomePage() {
             <tbody>
               {comments.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="emptyRow">
+                  <td colSpan={10} className="emptyRow">
                     {loading ? 'Loading insights...' : `No ${feedLabel(selectedFeed).toLowerCase()} found for ${selectedDate}.`}
                   </td>
                 </tr>
@@ -207,11 +227,13 @@ export default function HomePage() {
                           onChange={(event) => toggleRow(rowKey, event.target.checked)}
                         />
                       </td>
-                      <td>{comment.likeCount ?? comment.score ?? 0}</td>
+                      <td>{selectedFeed === 'signals' ? comment.score ?? '-' : '-'}</td>
+                      <td>{comment.likeCount ?? 0}</td>
                       <td>{comment.databaseName ?? comment.database ?? 'health'}</td>
                       <td>{formatLanguage(comment.detectedLanguage)}</td>
                       <td>{comment.authorDisplayName ?? comment.authorName ?? comment.author ?? 'Unknown'}</td>
                       <td className="videoTitle">{comment.videoTitle ?? '-'}</td>
+                      <td className="matchedRules">{formatMatchedRules(comment.matchedRuleGroups)}</td>
                       <td>{comment.text ?? comment.commentText ?? ''}</td>
                       <td>
                         {formatCollectedAt(
@@ -272,7 +294,7 @@ export default function HomePage() {
             channelTitle: comment.channelTitle,
             authorDisplayName: comment.authorDisplayName ?? comment.authorName ?? comment.author,
             text: comment.text ?? comment.commentText ?? '',
-            likeCount: comment.likeCount ?? comment.score ?? 0,
+            likeCount: comment.likeCount ?? 0,
             publishedAt: comment.publishedAt,
             fetchedAtIst: comment.fetchedAtIst ?? comment.fetchedAtUtc ?? comment.fetchedAt ?? comment.crawled_at,
             detectedLanguage: comment.detectedLanguage,
@@ -291,6 +313,13 @@ export default function HomePage() {
       setError((err as Error).message || 'Unable to save selected comments');
     }
   }
+}
+
+function formatMatchedRules(groups?: string[]) {
+  if (!groups || groups.length === 0) {
+    return '-';
+  }
+  return groups.map((group) => group.toLowerCase().replace(/_/g, ' ')).join(', ');
 }
 
 function feedLabel(feed: FeedFilter) {

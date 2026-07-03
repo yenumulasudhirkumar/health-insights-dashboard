@@ -20,7 +20,7 @@ A small Next.js dashboard for reviewing fresh health discussion signals from the
 ## API
 
 - `GET /api/top-comments?date=YYYY-MM-DD&feed=questions&database=both&language=all` proxies the backend relevant-health-question endpoint.
-- `GET /api/top-comments?date=YYYY-MM-DD&feed=signals&database=both&language=all` proxies the backend patient-signal endpoint.
+- `GET /api/top-comments?date=YYYY-MM-DD&feed=signals&database=both&language=all&minScore=6` proxies the backend patient-signal endpoint.
 - `POST /api/top-comments` proxies selected comments to the backend curation endpoint.
 
 The dashboard `View` dropdown supports:
@@ -29,6 +29,7 @@ The dashboard `View` dropdown supports:
 - Symptom / treatment signals
 
 Saved comments use `intendedUse: question_candidate` for Top questions and `intendedUse: patient_signal` for Symptom / treatment signals.
+The signals feed displays the rules-based classifier score and matched rule groups so strong drug-safety and patient-experience comments are easier to review.
 
 The dashboard supports language filtering for:
 

@@ -32,7 +32,7 @@ type FeedFilter = 'questions' | 'signals';
 
 export default function HomePage() {
   const [comments, setComments] = useState<Comment[]>([]);
-  const [selectedDate, setSelectedDate] = useState(() => getIstDateOffset(-1));
+  const [selectedDate, setSelectedDate] = useState(() => getIstDateOffset(0));
   const [selectedFeed, setSelectedFeed] = useState<FeedFilter>('questions');
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseFilter>('both');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageFilter>('all');

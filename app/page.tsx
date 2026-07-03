@@ -28,10 +28,12 @@ type Comment = {
 
 type DatabaseFilter = 'both' | 'main' | 'health';
 type LanguageFilter = 'all' | 'english' | 'hindi' | 'telugu' | 'mixed' | 'unknown';
+type FeedFilter = 'questions' | 'signals';
 
 export default function HomePage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => getIstDateOffset(-1));
+  const [selectedFeed, setSelectedFeed] = useState<FeedFilter>('questions');
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseFilter>('both');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageFilter>('all');
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -41,6 +43,7 @@ export default function HomePage() {
 
   const fetchComments = async (
     date = selectedDate,
+    feed = selectedFeed,
     database = selectedDatabase,
     language = selectedLanguage
   ) => {
@@ -49,7 +52,7 @@ export default function HomePage() {
     setSaveStatus(null);
 
     try {
-      const params = new URLSearchParams({ date, database, language });
+      const params = new URLSearchParams({ date, feed, database, language });
       const response = await fetch(`/api/top-comments?${params.toString()}`);
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
@@ -80,7 +83,8 @@ export default function HomePage() {
           <p className="eyebrow">Health insights</p>
           <h1>Relevant health questions</h1>
           <p className="description">
-            Review recent health questions after filtering short posts, spam, rants, and non-health chatter.
+            Review daily question candidates and patient symptom/treatment signals after filtering short posts, spam,
+            rants, and non-health chatter.
           </p>
         </div>
         <div className="heroControls" aria-label="Insight date controls">
@@ -92,9 +96,23 @@ export default function HomePage() {
               onChange={(event) => {
                 const nextDate = event.target.value;
                 setSelectedDate(nextDate);
-                fetchComments(nextDate, selectedDatabase, selectedLanguage);
+                fetchComments(nextDate, selectedFeed, selectedDatabase, selectedLanguage);
               }}
             />
+          </label>
+          <label className="dateField">
+            <span>View</span>
+            <select
+              value={selectedFeed}
+              onChange={(event) => {
+                const nextFeed = event.target.value as FeedFilter;
+                setSelectedFeed(nextFeed);
+                fetchComments(selectedDate, nextFeed, selectedDatabase, selectedLanguage);
+              }}
+            >
+              <option value="questions">Top questions</option>
+              <option value="signals">Symptom / treatment signals</option>
+            </select>
           </label>
           <label className="dateField">
             <span>Source</span>
@@ -103,7 +121,7 @@ export default function HomePage() {
               onChange={(event) => {
                 const nextDatabase = event.target.value as DatabaseFilter;
                 setSelectedDatabase(nextDatabase);
-                fetchComments(selectedDate, nextDatabase, selectedLanguage);
+                fetchComments(selectedDate, selectedFeed, nextDatabase, selectedLanguage);
               }}
             >
               <option value="both">Both DBs</option>
@@ -118,7 +136,7 @@ export default function HomePage() {
               onChange={(event) => {
                 const nextLanguage = event.target.value as LanguageFilter;
                 setSelectedLanguage(nextLanguage);
-                fetchComments(selectedDate, selectedDatabase, nextLanguage);
+                fetchComments(selectedDate, selectedFeed, selectedDatabase, nextLanguage);
               }}
             >
               <option value="all">All</option>
@@ -173,7 +191,7 @@ export default function HomePage() {
               {comments.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="emptyRow">
-                    {loading ? 'Loading insights...' : `No relevant health questions found for ${selectedDate}.`}
+                    {loading ? 'Loading insights...' : `No ${feedLabel(selectedFeed).toLowerCase()} found for ${selectedDate}.`}
                   </td>
                 </tr>
               ) : (
@@ -213,7 +231,7 @@ export default function HomePage() {
 
   function chooseDate(date: string) {
     setSelectedDate(date);
-    fetchComments(date, selectedDatabase, selectedLanguage);
+    fetchComments(date, selectedFeed, selectedDatabase, selectedLanguage);
   }
 
   function toggleRow(rowKey: string, selected: boolean) {
@@ -243,7 +261,7 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           selectedBy: 'sudhir',
-          intendedUse: 'question_candidate',
+          intendedUse: selectedFeed === 'questions' ? 'question_candidate' : 'patient_signal',
           qualityLabel: 'manual_selected',
           comments: selectedComments.map((comment) => ({
             databaseName: comment.databaseName ?? comment.database,
@@ -273,6 +291,10 @@ export default function HomePage() {
       setError((err as Error).message || 'Unable to save selected comments');
     }
   }
+}
+
+function feedLabel(feed: FeedFilter) {
+  return feed === 'questions' ? 'Top questions' : 'Symptom / treatment signals';
 }
 
 function getCommentKey(comment: Comment, index: number) {

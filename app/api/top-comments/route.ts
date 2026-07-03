@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
       timeZone: 'Asia/Kolkata',
     });
     const requestedDate = request.nextUrl.searchParams.get('date') ?? fallbackDateIst;
+    const requestedFeed = request.nextUrl.searchParams.get('feed') ?? 'questions';
     const requestedDatabase = request.nextUrl.searchParams.get('database') ?? 'both';
     const requestedLanguage = request.nextUrl.searchParams.get('language') ?? 'all';
 
@@ -28,6 +29,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database must be main, health, or both.' }, { status: 400 });
     }
 
+    if (!['questions', 'signals'].includes(requestedFeed)) {
+      return NextResponse.json({ error: 'Feed must be questions or signals.' }, { status: 400 });
+    }
+
     if (!['all', 'english', 'hindi', 'telugu', 'mixed', 'unknown'].includes(requestedLanguage)) {
       return NextResponse.json(
         { error: 'Language must be all, english, hindi, telugu, mixed, or unknown.' },
@@ -35,7 +40,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const upstream = new URL('api/comments/relevant-questions', normalizedBaseUrl);
+    const upstreamPath =
+      requestedFeed === 'signals' ? 'api/comments/patient-signals' : 'api/comments/relevant-questions';
+    const upstream = new URL(upstreamPath, normalizedBaseUrl);
     upstream.searchParams.set('date', requestedDate);
     upstream.searchParams.set('database', requestedDatabase);
     upstream.searchParams.set('language', requestedLanguage);

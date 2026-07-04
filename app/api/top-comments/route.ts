@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const requestedFeed = request.nextUrl.searchParams.get('feed') ?? 'questions';
     const requestedDatabase = request.nextUrl.searchParams.get('database') ?? 'both';
     const requestedLanguage = request.nextUrl.searchParams.get('language') ?? 'all';
+    const requestedSourceMode = request.nextUrl.searchParams.get('sourceMode') ?? 'all';
     const requestedMinScore = request.nextUrl.searchParams.get('minScore') ?? '6';
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
@@ -32,6 +33,10 @@ export async function GET(request: NextRequest) {
 
     if (!['questions', 'signals'].includes(requestedFeed)) {
       return NextResponse.json({ error: 'Feed must be questions or signals.' }, { status: 400 });
+    }
+
+    if (!['all', 'channel', 'keyword'].includes(requestedSourceMode)) {
+      return NextResponse.json({ error: 'Source mode must be all, channel, or keyword.' }, { status: 400 });
     }
 
     if (!/^\d+$/.test(requestedMinScore)) {
@@ -51,6 +56,7 @@ export async function GET(request: NextRequest) {
     upstream.searchParams.set('date', requestedDate);
     upstream.searchParams.set('database', requestedDatabase);
     upstream.searchParams.set('language', requestedLanguage);
+    upstream.searchParams.set('sourceMode', requestedSourceMode);
     upstream.searchParams.set('limit', '50');
     if (requestedFeed === 'signals') {
       upstream.searchParams.set('minScore', requestedMinScore);

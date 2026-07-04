@@ -34,6 +34,9 @@ type Comment = {
   importBatchName?: string;
   candidateDate?: string;
   sourcePublishedAt?: string;
+  matchedKeyword?: string;
+  keywordSearchRank?: number;
+  keywordCrawledAt?: string;
   reviewedBy?: string;
   reviewedAt?: string;
   fetchedAt?: string;
@@ -46,6 +49,7 @@ type Comment = {
 type DatabaseFilter = 'both' | 'main' | 'health';
 type LanguageFilter = 'all' | 'english' | 'hindi' | 'telugu' | 'mixed' | 'unknown';
 type FeedFilter = 'questions' | 'signals' | 'reviewed';
+type SourceModeFilter = 'all' | 'channel' | 'keyword';
 type ReviewedDateType = 'reviewed' | 'candidate';
 type ReviewForm = {
   symptoms: string[];
@@ -130,6 +134,7 @@ export default function HomePage() {
   const [selectedFeed, setSelectedFeed] = useState<FeedFilter>('questions');
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseFilter>('both');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageFilter>('all');
+  const [selectedSourceMode, setSelectedSourceMode] = useState<SourceModeFilter>('all');
   const [reviewedDateType, setReviewedDateType] = useState<ReviewedDateType>('reviewed');
   const [minScore, setMinScore] = useState(6);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -146,6 +151,7 @@ export default function HomePage() {
     database = selectedDatabase,
     language = selectedLanguage,
     score = minScore,
+    sourceMode = selectedSourceMode,
     dateType = reviewedDateType
   ) => {
     setLoading(true);
@@ -156,7 +162,7 @@ export default function HomePage() {
       const params =
         feed === 'reviewed'
           ? new URLSearchParams({ date, database, language, dateType, limit: '100' })
-          : new URLSearchParams({ date, feed, database, language, minScore: String(score) });
+          : new URLSearchParams({ date, feed, database, language, sourceMode, minScore: String(score) });
       const response = await fetch(
         feed === 'reviewed' ? `/api/reviewed-comments?${params.toString()}` : `/api/top-comments?${params.toString()}`
       );
@@ -202,7 +208,7 @@ export default function HomePage() {
               onChange={(event) => {
                 const nextDate = event.target.value;
                 setSelectedDate(nextDate);
-                fetchComments(nextDate, selectedFeed, selectedDatabase, selectedLanguage);
+                fetchComments(nextDate, selectedFeed, selectedDatabase, selectedLanguage, minScore, selectedSourceMode);
               }}
             />
           </label>
@@ -213,7 +219,7 @@ export default function HomePage() {
               onChange={(event) => {
                 const nextFeed = event.target.value as FeedFilter;
                 setSelectedFeed(nextFeed);
-                fetchComments(selectedDate, nextFeed, selectedDatabase, selectedLanguage);
+                fetchComments(selectedDate, nextFeed, selectedDatabase, selectedLanguage, minScore, selectedSourceMode);
               }}
             >
               <option value="questions">Top questions</option>
@@ -228,7 +234,7 @@ export default function HomePage() {
               onChange={(event) => {
                 const nextDatabase = event.target.value as DatabaseFilter;
                 setSelectedDatabase(nextDatabase);
-                fetchComments(selectedDate, selectedFeed, nextDatabase, selectedLanguage);
+                fetchComments(selectedDate, selectedFeed, nextDatabase, selectedLanguage, minScore, selectedSourceMode);
               }}
             >
               <option value="both">Both DBs</option>
@@ -243,7 +249,7 @@ export default function HomePage() {
               onChange={(event) => {
                 const nextLanguage = event.target.value as LanguageFilter;
                 setSelectedLanguage(nextLanguage);
-                fetchComments(selectedDate, selectedFeed, selectedDatabase, nextLanguage);
+                fetchComments(selectedDate, selectedFeed, selectedDatabase, nextLanguage, minScore, selectedSourceMode);
               }}
             >
               <option value="all">All</option>
@@ -254,6 +260,23 @@ export default function HomePage() {
               <option value="unknown">Unknown</option>
             </select>
           </label>
+          {selectedFeed !== 'reviewed' ? (
+            <label className="dateField">
+              <span>Source mode</span>
+              <select
+                value={selectedSourceMode}
+                onChange={(event) => {
+                  const nextSourceMode = event.target.value as SourceModeFilter;
+                  setSelectedSourceMode(nextSourceMode);
+                  fetchComments(selectedDate, selectedFeed, selectedDatabase, selectedLanguage, minScore, nextSourceMode);
+                }}
+              >
+                <option value="all">All sources</option>
+                <option value="channel">Channel crawl</option>
+                <option value="keyword">Keyword search</option>
+              </select>
+            </label>
+          ) : null}
           {selectedFeed === 'signals' ? (
           <label className="dateField compactField">
             <span>Min score</span>
@@ -262,7 +285,7 @@ export default function HomePage() {
               onChange={(event) => {
                 const nextMinScore = Number(event.target.value);
                 setMinScore(nextMinScore);
-                fetchComments(selectedDate, selectedFeed, selectedDatabase, selectedLanguage, nextMinScore);
+                fetchComments(selectedDate, selectedFeed, selectedDatabase, selectedLanguage, nextMinScore, selectedSourceMode);
               }}
             >
               <option value={4}>4</option>
@@ -279,7 +302,15 @@ export default function HomePage() {
                 onChange={(event) => {
                   const nextDateType = event.target.value as ReviewedDateType;
                   setReviewedDateType(nextDateType);
-                  fetchComments(selectedDate, selectedFeed, selectedDatabase, selectedLanguage, minScore, nextDateType);
+                  fetchComments(
+                    selectedDate,
+                    selectedFeed,
+                    selectedDatabase,
+                    selectedLanguage,
+                    minScore,
+                    selectedSourceMode,
+                    nextDateType
+                  );
                 }}
               >
                 <option value="reviewed">Review date</option>
@@ -363,7 +394,7 @@ export default function HomePage() {
                       </td>
                       <td>{selectedFeed === 'reviewed' ? formatOption(comment.quality ?? '-') : selectedFeed === 'signals' ? comment.score ?? '-' : '-'}</td>
                       <td>{selectedFeed === 'reviewed' ? formatOption(comment.urgencyLevel ?? '-') : comment.likeCount ?? 0}</td>
-                      <td>{comment.sourceDb ?? comment.databaseName ?? comment.database ?? 'health'}</td>
+                      <td>{formatSourceCell(comment)}</td>
                       <td>{formatLanguage(comment.detectedLanguage)}</td>
                       <td>{comment.authorDisplayName ?? comment.authorName ?? comment.author ?? 'Unknown'}</td>
                       <td className="videoTitle">{comment.videoTitle ?? '-'}</td>
@@ -403,7 +434,7 @@ export default function HomePage() {
 
   function chooseDate(date: string) {
     setSelectedDate(date);
-    fetchComments(date, selectedFeed, selectedDatabase, selectedLanguage);
+    fetchComments(date, selectedFeed, selectedDatabase, selectedLanguage, minScore, selectedSourceMode);
   }
 
   function toggleRow(rowKey: string, selected: boolean) {
@@ -580,6 +611,10 @@ function buildCsv(comments: Comment[], feed: FeedFilter) {
     'detected_language',
     'candidate_date',
     'source_published_at',
+    'source_mode',
+    'matched_keyword',
+    'keyword_search_rank',
+    'keyword_crawled_at',
     'score',
     'matched_rule_groups',
     'suggested_symptoms',
@@ -607,6 +642,10 @@ function buildCsv(comments: Comment[], feed: FeedFilter) {
     comment.detectedLanguage ?? '',
     comment.candidateDate ?? '',
     comment.sourcePublishedAt ?? comment.publishedAt ?? '',
+    comment.matchedKeyword ? 'keyword' : 'channel',
+    comment.matchedKeyword ?? '',
+    comment.keywordSearchRank ?? '',
+    comment.keywordCrawledAt ?? '',
     comment.score ?? '',
     (comment.matchedRuleGroups ?? []).join('|'),
     (comment.symptoms ?? []).join('|'),
@@ -636,6 +675,16 @@ function formatMatchedRules(groups?: string[]) {
     return '-';
   }
   return groups.map((group) => group.toLowerCase().replace(/_/g, ' ')).join(', ');
+}
+
+function formatSourceCell(comment: Comment) {
+  const sourceDb = comment.sourceDb ?? comment.databaseName ?? comment.database ?? 'health';
+  if (!comment.matchedKeyword) {
+    return sourceDb;
+  }
+
+  const rank = comment.keywordSearchRank ? ` #${comment.keywordSearchRank}` : '';
+  return `${sourceDb} | keyword: ${comment.matchedKeyword}${rank}`;
 }
 
 function formatReviewSummary(comment: Comment) {
@@ -687,7 +736,20 @@ function ReviewModal({
         <div className="sourcePanel">
           <div>
             <strong>Source</strong>
-            <span>{comment.databaseName ?? comment.database ?? 'unknown'}</span>
+            <span>{formatSourceCell(comment)}</span>
+          </div>
+          {comment.matchedKeyword ? (
+            <div>
+              <strong>Keyword crawl</strong>
+              <span>
+                {comment.matchedKeyword}
+                {comment.keywordCrawledAt ? ` on ${formatCollectedAt(comment.keywordCrawledAt)}` : ''}
+              </span>
+            </div>
+          ) : null}
+          <div>
+            <strong>Source type</strong>
+            <span>{comment.matchedKeyword ? 'Keyword search' : 'Channel crawl'}</span>
           </div>
           <div>
             <strong>Video</strong>

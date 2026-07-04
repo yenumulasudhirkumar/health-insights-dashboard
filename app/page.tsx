@@ -26,6 +26,7 @@ type Comment = {
   possibleConditions?: string[];
   medicalSpecialty?: string;
   urgencyLevel?: string;
+  supportingTags?: string[];
   causalityConfidence?: string;
   quality?: string;
   reviewNote?: string;
@@ -274,6 +275,9 @@ export default function HomePage() {
           <button className="refreshButton" onClick={() => fetchComments()} disabled={loading}>
             {loading ? 'Refreshing...' : 'Refresh'}
           </button>
+          <button className="secondaryButton" onClick={exportCsv} disabled={loading || comments.length === 0}>
+            Export CSV
+          </button>
           <button
             className="refreshButton"
             onClick={saveSelectedComments}
@@ -516,6 +520,79 @@ export default function HomePage() {
       setError((err as Error).message || 'Unable to save selected comments');
     }
   }
+
+  function exportCsv() {
+    if (comments.length === 0) {
+      return;
+    }
+
+    const csv = buildCsv(comments, selectedFeed);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `health-insights-${selectedFeed}-${selectedDate}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setSaveStatus(`Exported ${comments.length} ${feedLabel(selectedFeed).toLowerCase()} rows.`);
+  }
+}
+
+function buildCsv(comments: Comment[], feed: FeedFilter) {
+  const headers = [
+    'feed',
+    'source_db',
+    'source_comment_id',
+    'video_id',
+    'video_title',
+    'channel_title',
+    'comment_text',
+    'detected_language',
+    'score',
+    'matched_rule_groups',
+    'suggested_symptoms',
+    'suggested_possible_conditions',
+    'suggested_medical_specialty',
+    'suggested_urgency',
+    'suggested_supporting_tags',
+    'suggested_causality_confidence',
+    'quality',
+    'review_note',
+    'reviewed_by',
+    'reviewed_at',
+  ];
+
+  const rows = comments.map((comment) => [
+    feed,
+    comment.sourceDb ?? comment.databaseName ?? comment.database ?? '',
+    comment.sourceCommentId ?? comment.commentId ?? String(comment.id ?? ''),
+    comment.videoId ?? '',
+    comment.videoTitle ?? '',
+    comment.channelTitle ?? '',
+    comment.text ?? comment.commentText ?? '',
+    comment.detectedLanguage ?? '',
+    comment.score ?? '',
+    (comment.matchedRuleGroups ?? []).join('|'),
+    (comment.symptoms ?? []).join('|'),
+    (comment.possibleConditions ?? []).join('|'),
+    comment.medicalSpecialty ?? '',
+    comment.urgencyLevel ?? '',
+    (comment.supportingTags ?? []).join('|'),
+    comment.causalityConfidence ?? '',
+    comment.quality ?? '',
+    comment.reviewNote ?? '',
+    comment.reviewedBy ?? '',
+    comment.reviewedAt ?? '',
+  ]);
+
+  return [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\n');
+}
+
+function csvCell(value: string | number) {
+  const text = String(value ?? '');
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 function formatMatchedRules(groups?: string[]) {

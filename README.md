@@ -34,7 +34,7 @@ The dashboard `View` dropdown supports:
 Saved comments use `intendedUse: question_candidate` for Top questions and `intendedUse: patient_signal` for Symptom / treatment signals.
 The signals feed displays the rules-based classifier score and matched rule groups so strong drug-safety and patient-experience comments are easier to review.
 The reviewed records view lists saved gold-dataset reviews with quality, urgency, specialty, causality confidence, symptoms, and possible conditions.
-Use `Export CSV` to download the currently loaded rows for batch AI tagging or offline review. Candidate exports include blank suggested-label columns; reviewed-record exports include the saved structured fields where available.
+Use `Export CSV` to download the currently loaded rows for batch AI tagging or offline review. Candidate exports include blank suggested-label columns; reviewed-record exports include the saved structured fields where available. Reviewed records now include `candidate_date`, `review_status`, and `import_batch_name` so AI drafts can be separated from human-approved gold labels.
 
 The dashboard supports language filtering for:
 

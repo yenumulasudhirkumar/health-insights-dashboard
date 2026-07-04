@@ -30,6 +30,10 @@ type Comment = {
   causalityConfidence?: string;
   quality?: string;
   reviewNote?: string;
+  reviewStatus?: string;
+  importBatchName?: string;
+  candidateDate?: string;
+  sourcePublishedAt?: string;
   reviewedBy?: string;
   reviewedAt?: string;
   fetchedAt?: string;
@@ -42,6 +46,7 @@ type Comment = {
 type DatabaseFilter = 'both' | 'main' | 'health';
 type LanguageFilter = 'all' | 'english' | 'hindi' | 'telugu' | 'mixed' | 'unknown';
 type FeedFilter = 'questions' | 'signals' | 'reviewed';
+type ReviewedDateType = 'reviewed' | 'candidate';
 type ReviewForm = {
   symptoms: string[];
   symptomInput: string;
@@ -125,6 +130,7 @@ export default function HomePage() {
   const [selectedFeed, setSelectedFeed] = useState<FeedFilter>('questions');
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseFilter>('both');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageFilter>('all');
+  const [reviewedDateType, setReviewedDateType] = useState<ReviewedDateType>('reviewed');
   const [minScore, setMinScore] = useState(6);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
@@ -139,7 +145,8 @@ export default function HomePage() {
     feed = selectedFeed,
     database = selectedDatabase,
     language = selectedLanguage,
-    score = minScore
+    score = minScore,
+    dateType = reviewedDateType
   ) => {
     setLoading(true);
     setError(null);
@@ -148,7 +155,7 @@ export default function HomePage() {
     try {
       const params =
         feed === 'reviewed'
-          ? new URLSearchParams({ date, database, language, limit: '100' })
+          ? new URLSearchParams({ date, database, language, dateType, limit: '100' })
           : new URLSearchParams({ date, feed, database, language, minScore: String(score) });
       const response = await fetch(
         feed === 'reviewed' ? `/api/reviewed-comments?${params.toString()}` : `/api/top-comments?${params.toString()}`
@@ -263,6 +270,22 @@ export default function HomePage() {
               <option value={8}>8</option>
             </select>
           </label>
+          ) : null}
+          {selectedFeed === 'reviewed' ? (
+            <label className="dateField compactField">
+              <span>Date type</span>
+              <select
+                value={reviewedDateType}
+                onChange={(event) => {
+                  const nextDateType = event.target.value as ReviewedDateType;
+                  setReviewedDateType(nextDateType);
+                  fetchComments(selectedDate, selectedFeed, selectedDatabase, selectedLanguage, minScore, nextDateType);
+                }}
+              >
+                <option value="reviewed">Review date</option>
+                <option value="candidate">Candidate date</option>
+              </select>
+            </label>
           ) : null}
           <div className="quickActions">
             <button type="button" onClick={() => chooseDate(getIstDateOffset(0))} disabled={loading}>
@@ -438,6 +461,9 @@ export default function HomePage() {
               channelTitle: comment.channelTitle,
               commentText: comment.text ?? comment.commentText ?? '',
               detectedLanguage: comment.detectedLanguage,
+              candidateDate: selectedDate,
+              sourcePublishedAt:
+                comment.publishedAt ?? comment.fetchedAtIst ?? comment.fetchedAtUtc ?? comment.fetchedAt ?? comment.crawled_at,
               symptoms: reviewForm.symptoms,
               possibleConditions: reviewForm.possibleConditions,
               medicalSpecialty: reviewForm.medicalSpecialty,
@@ -447,6 +473,8 @@ export default function HomePage() {
               labels: reviewForm.supportingTags,
               quality: reviewForm.quality,
               reviewNote: reviewForm.reviewNote,
+              reviewStatus: 'human_approved',
+              importBatchName: `${selectedFeed}_${selectedDate}`,
             },
           ],
         }),
@@ -550,6 +578,8 @@ function buildCsv(comments: Comment[], feed: FeedFilter) {
     'channel_title',
     'comment_text',
     'detected_language',
+    'candidate_date',
+    'source_published_at',
     'score',
     'matched_rule_groups',
     'suggested_symptoms',
@@ -560,6 +590,8 @@ function buildCsv(comments: Comment[], feed: FeedFilter) {
     'suggested_causality_confidence',
     'quality',
     'review_note',
+    'review_status',
+    'import_batch_name',
     'reviewed_by',
     'reviewed_at',
   ];
@@ -573,6 +605,8 @@ function buildCsv(comments: Comment[], feed: FeedFilter) {
     comment.channelTitle ?? '',
     comment.text ?? comment.commentText ?? '',
     comment.detectedLanguage ?? '',
+    comment.candidateDate ?? '',
+    comment.sourcePublishedAt ?? comment.publishedAt ?? '',
     comment.score ?? '',
     (comment.matchedRuleGroups ?? []).join('|'),
     (comment.symptoms ?? []).join('|'),
@@ -583,6 +617,8 @@ function buildCsv(comments: Comment[], feed: FeedFilter) {
     comment.causalityConfidence ?? '',
     comment.quality ?? '',
     comment.reviewNote ?? '',
+    comment.reviewStatus ?? '',
+    comment.importBatchName ?? '',
     comment.reviewedBy ?? '',
     comment.reviewedAt ?? '',
   ]);
@@ -605,6 +641,7 @@ function formatMatchedRules(groups?: string[]) {
 function formatReviewSummary(comment: Comment) {
   const parts = [
     comment.medicalSpecialty ? `specialty: ${formatOption(comment.medicalSpecialty)}` : null,
+    comment.reviewStatus ? `status: ${formatOption(comment.reviewStatus)}` : null,
     comment.causalityConfidence ? `causality: ${formatOption(comment.causalityConfidence)}` : null,
     comment.symptoms && comment.symptoms.length > 0 ? `symptoms: ${comment.symptoms.join(', ')}` : null,
     comment.possibleConditions && comment.possibleConditions.length > 0

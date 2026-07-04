@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 type Comment = {
   id?: number | string;
   commentId?: string;
+  sourceCommentId?: string;
+  sourceDb?: string;
   database?: string;
   databaseName?: string;
   authorDisplayName?: string;
@@ -20,6 +22,15 @@ type Comment = {
   likeCount?: number;
   score?: number;
   matchedRuleGroups?: string[];
+  symptoms?: string[];
+  possibleConditions?: string[];
+  medicalSpecialty?: string;
+  urgencyLevel?: string;
+  causalityConfidence?: string;
+  quality?: string;
+  reviewNote?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
   fetchedAt?: string;
   fetchedAtUtc?: string;
   fetchedAtIst?: string;
@@ -29,7 +40,7 @@ type Comment = {
 
 type DatabaseFilter = 'both' | 'main' | 'health';
 type LanguageFilter = 'all' | 'english' | 'hindi' | 'telugu' | 'mixed' | 'unknown';
-type FeedFilter = 'questions' | 'signals';
+type FeedFilter = 'questions' | 'signals' | 'reviewed';
 type ReviewForm = {
   symptoms: string[];
   symptomInput: string;
@@ -134,8 +145,13 @@ export default function HomePage() {
     setSaveStatus(null);
 
     try {
-      const params = new URLSearchParams({ date, feed, database, language, minScore: String(score) });
-      const response = await fetch(`/api/top-comments?${params.toString()}`);
+      const params =
+        feed === 'reviewed'
+          ? new URLSearchParams({ date, database, language, limit: '100' })
+          : new URLSearchParams({ date, feed, database, language, minScore: String(score) });
+      const response = await fetch(
+        feed === 'reviewed' ? `/api/reviewed-comments?${params.toString()}` : `/api/top-comments?${params.toString()}`
+      );
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
       }
@@ -194,6 +210,7 @@ export default function HomePage() {
             >
               <option value="questions">Top questions</option>
               <option value="signals">Symptom / treatment signals</option>
+              <option value="reviewed">Reviewed records</option>
             </select>
           </label>
           <label className="dateField">
@@ -229,6 +246,7 @@ export default function HomePage() {
               <option value="unknown">Unknown</option>
             </select>
           </label>
+          {selectedFeed === 'signals' ? (
           <label className="dateField compactField">
             <span>Min score</span>
             <select
@@ -244,6 +262,7 @@ export default function HomePage() {
               <option value={8}>8</option>
             </select>
           </label>
+          ) : null}
           <div className="quickActions">
             <button type="button" onClick={() => chooseDate(getIstDateOffset(0))} disabled={loading}>
               Today
@@ -258,7 +277,7 @@ export default function HomePage() {
           <button
             className="refreshButton"
             onClick={saveSelectedComments}
-            disabled={loading || selectedRows.size === 0}
+            disabled={loading || selectedFeed === 'reviewed' || selectedRows.size === 0}
           >
             Save selected
           </button>
@@ -275,15 +294,15 @@ export default function HomePage() {
             <thead>
               <tr>
                 <th>Select</th>
-                <th>Score</th>
-                <th>Likes</th>
+                <th>{selectedFeed === 'reviewed' ? 'Quality' : 'Score'}</th>
+                <th>{selectedFeed === 'reviewed' ? 'Urgency' : 'Likes'}</th>
                 <th>Source</th>
                 <th>Language</th>
                 <th>Author</th>
                 <th>Video</th>
-                <th>Matched rules</th>
+                <th>{selectedFeed === 'reviewed' ? 'Review summary' : 'Matched rules'}</th>
                 <th>Text</th>
-                <th>Collected At</th>
+                <th>{selectedFeed === 'reviewed' ? 'Reviewed At' : 'Collected At'}</th>
               </tr>
             </thead>
             <tbody>
@@ -297,28 +316,40 @@ export default function HomePage() {
                 comments.map((comment, index) => {
                   const rowKey = getCommentKey(comment, index);
                   return (
-                    <tr key={rowKey} className="reviewableRow" onClick={() => openReview(index)}>
+                    <tr
+                      key={rowKey}
+                      className={selectedFeed === 'reviewed' ? undefined : 'reviewableRow'}
+                      onClick={() => selectedFeed !== 'reviewed' && openReview(index)}
+                    >
                       <td>
-                        <input
-                          aria-label="Select comment"
-                          type="checkbox"
-                          checked={selectedRows.has(rowKey)}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={(event) => toggleRow(rowKey, event.target.checked)}
-                        />
+                        {selectedFeed === 'reviewed' ? (
+                          '-'
+                        ) : (
+                          <input
+                            aria-label="Select comment"
+                            type="checkbox"
+                            checked={selectedRows.has(rowKey)}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => toggleRow(rowKey, event.target.checked)}
+                          />
+                        )}
                       </td>
-                      <td>{selectedFeed === 'signals' ? comment.score ?? '-' : '-'}</td>
-                      <td>{comment.likeCount ?? 0}</td>
-                      <td>{comment.databaseName ?? comment.database ?? 'health'}</td>
+                      <td>{selectedFeed === 'reviewed' ? formatOption(comment.quality ?? '-') : selectedFeed === 'signals' ? comment.score ?? '-' : '-'}</td>
+                      <td>{selectedFeed === 'reviewed' ? formatOption(comment.urgencyLevel ?? '-') : comment.likeCount ?? 0}</td>
+                      <td>{comment.sourceDb ?? comment.databaseName ?? comment.database ?? 'health'}</td>
                       <td>{formatLanguage(comment.detectedLanguage)}</td>
                       <td>{comment.authorDisplayName ?? comment.authorName ?? comment.author ?? 'Unknown'}</td>
                       <td className="videoTitle">{comment.videoTitle ?? '-'}</td>
-                      <td className="matchedRules">{formatMatchedRules(comment.matchedRuleGroups)}</td>
+                      <td className="matchedRules">
+                        {selectedFeed === 'reviewed' ? formatReviewSummary(comment) : formatMatchedRules(comment.matchedRuleGroups)}
+                      </td>
                       <td>{comment.text ?? comment.commentText ?? ''}</td>
                       <td>
-                        {formatCollectedAt(
-                          comment.fetchedAtIst ?? comment.fetchedAtUtc ?? comment.fetchedAt ?? comment.crawled_at
-                        )}
+                        {selectedFeed === 'reviewed'
+                          ? formatCollectedAt(comment.reviewedAt)
+                          : formatCollectedAt(
+                              comment.fetchedAtIst ?? comment.fetchedAtUtc ?? comment.fetchedAt ?? comment.crawled_at
+                            )}
                       </td>
                     </tr>
                   );
@@ -361,6 +392,9 @@ export default function HomePage() {
   }
 
   function openReview(index: number) {
+    if (selectedFeed === 'reviewed') {
+      return;
+    }
     setReviewIndex(index);
     setReviewForm({
       ...DEFAULT_REVIEW_FORM,
@@ -394,7 +428,7 @@ export default function HomePage() {
           comments: [
             {
               databaseName: comment.databaseName ?? comment.database,
-              sourceCommentId: comment.commentId ?? String(comment.id ?? ''),
+              sourceCommentId: comment.commentId ?? comment.sourceCommentId ?? String(comment.id ?? ''),
               videoId: comment.videoId,
               videoTitle: comment.videoTitle,
               channelTitle: comment.channelTitle,
@@ -489,6 +523,19 @@ function formatMatchedRules(groups?: string[]) {
     return '-';
   }
   return groups.map((group) => group.toLowerCase().replace(/_/g, ' ')).join(', ');
+}
+
+function formatReviewSummary(comment: Comment) {
+  const parts = [
+    comment.medicalSpecialty ? `specialty: ${formatOption(comment.medicalSpecialty)}` : null,
+    comment.causalityConfidence ? `causality: ${formatOption(comment.causalityConfidence)}` : null,
+    comment.symptoms && comment.symptoms.length > 0 ? `symptoms: ${comment.symptoms.join(', ')}` : null,
+    comment.possibleConditions && comment.possibleConditions.length > 0
+      ? `conditions: ${comment.possibleConditions.join(', ')}`
+      : null,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(' | ') : '-';
 }
 
 function ReviewModal({
@@ -746,11 +793,19 @@ function formatOption(value: string) {
 }
 
 function feedLabel(feed: FeedFilter) {
-  return feed === 'questions' ? 'Top questions' : 'Symptom / treatment signals';
+  if (feed === 'questions') {
+    return 'Top questions';
+  }
+  if (feed === 'signals') {
+    return 'Symptom / treatment signals';
+  }
+  return 'Reviewed records';
 }
 
 function getCommentKey(comment: Comment, index: number) {
-  return `${comment.databaseName ?? comment.database ?? 'unknown'}:${comment.commentId ?? comment.id ?? index}`;
+  return `${comment.sourceDb ?? comment.databaseName ?? comment.database ?? 'unknown'}:${
+    comment.sourceCommentId ?? comment.commentId ?? comment.id ?? index
+  }`;
 }
 
 function formatLanguage(value?: string) {

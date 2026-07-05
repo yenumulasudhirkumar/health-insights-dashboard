@@ -376,12 +376,17 @@ export default function HomePage() {
                   return (
                     <tr
                       key={rowKey}
-                      className={selectedFeed === 'reviewed' ? undefined : 'reviewableRow'}
-                      onClick={() => selectedFeed !== 'reviewed' && openReview(index)}
+                      className="reviewableRow"
+                      onClick={() => openReview(index)}
                     >
                       <td>
                         {selectedFeed === 'reviewed' ? (
-                          '-'
+                          <button type="button" className="tableActionButton" onClick={(event) => {
+                            event.stopPropagation();
+                            openReview(index);
+                          }}>
+                            Edit
+                          </button>
                         ) : (
                           <input
                             aria-label="Select comment"
@@ -450,13 +455,24 @@ export default function HomePage() {
   }
 
   function openReview(index: number) {
-    if (selectedFeed === 'reviewed') {
-      return;
-    }
+    const comment = comments[index];
     setReviewIndex(index);
     setReviewForm({
       ...DEFAULT_REVIEW_FORM,
-      supportingTags: selectedFeed === 'signals' ? ['PATIENT_EXPERIENCE'] : ['HEALTH_QUESTION'],
+      symptoms: comment?.symptoms ?? [],
+      possibleConditions: comment?.possibleConditions ?? [],
+      medicalSpecialty: comment?.medicalSpecialty ?? DEFAULT_REVIEW_FORM.medicalSpecialty,
+      urgencyLevel: comment?.urgencyLevel ?? DEFAULT_REVIEW_FORM.urgencyLevel,
+      supportingTags:
+        comment?.supportingTags ??
+        (selectedFeed === 'signals'
+          ? ['PATIENT_EXPERIENCE']
+          : selectedFeed === 'questions'
+            ? ['HEALTH_QUESTION']
+            : []),
+      causalityConfidence: comment?.causalityConfidence ?? DEFAULT_REVIEW_FORM.causalityConfidence,
+      reviewNote: comment?.reviewNote ?? '',
+      quality: comment?.quality ?? DEFAULT_REVIEW_FORM.quality,
     });
     setSaveStatus(null);
     setError(null);
@@ -486,15 +502,21 @@ export default function HomePage() {
           comments: [
             {
               databaseName: comment.databaseName ?? comment.database,
+              database: comment.sourceDb,
               sourceCommentId: comment.commentId ?? comment.sourceCommentId ?? String(comment.id ?? ''),
               videoId: comment.videoId,
               videoTitle: comment.videoTitle,
               channelTitle: comment.channelTitle,
               commentText: comment.text ?? comment.commentText ?? '',
               detectedLanguage: comment.detectedLanguage,
-              candidateDate: selectedDate,
+              candidateDate: comment.candidateDate ?? selectedDate,
               sourcePublishedAt:
-                comment.publishedAt ?? comment.fetchedAtIst ?? comment.fetchedAtUtc ?? comment.fetchedAt ?? comment.crawled_at,
+                comment.sourcePublishedAt ??
+                comment.publishedAt ??
+                comment.fetchedAtIst ??
+                comment.fetchedAtUtc ??
+                comment.fetchedAt ??
+                comment.crawled_at,
               symptoms: reviewForm.symptoms,
               possibleConditions: reviewForm.possibleConditions,
               medicalSpecialty: reviewForm.medicalSpecialty,
@@ -505,7 +527,10 @@ export default function HomePage() {
               quality: reviewForm.quality,
               reviewNote: reviewForm.reviewNote,
               reviewStatus: 'human_approved',
-              importBatchName: `${selectedFeed}_${selectedDate}`,
+              importBatchName:
+                selectedFeed === 'reviewed'
+                  ? comment.importBatchName ?? `gold_seed_${selectedDate}`
+                  : `${selectedFeed}_${selectedDate}`,
             },
           ],
         }),
@@ -517,6 +542,9 @@ export default function HomePage() {
       }
 
       setSaveStatus('Reviewed comment saved.');
+      if (selectedFeed === 'reviewed') {
+        fetchComments();
+      }
       if (moveNext) {
         const nextIndex = reviewIndex + 1;
         if (nextIndex < comments.length) {

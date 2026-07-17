@@ -22,6 +22,7 @@ A small Next.js dashboard for reviewing fresh health discussion signals from the
 - `GET /api/top-comments?date=YYYY-MM-DD&feed=questions&database=both&language=all` proxies the backend relevant-health-question endpoint.
 - `GET /api/top-comments?date=YYYY-MM-DD&feed=signals&database=both&language=all&minScore=6` proxies the backend patient-signal endpoint.
 - `GET /api/reviewed-comments?date=YYYY-MM-DD&database=both&language=all` proxies the backend reviewed-comment audit endpoint.
+- `GET /api/daily-candidates?token=...&date=YYYY-MM-DD&limit=20&includeFullText=true` proxies the cached automation candidate endpoint for ChatGPT scheduled dry runs.
 - `POST /api/top-comments` proxies selected comments to the backend curation endpoint.
 - `POST /api/reviewed-comments` proxies structured reviewed comments to the backend gold-dataset endpoint.
 

@@ -51,6 +51,7 @@ type LanguageFilter = 'all' | 'english' | 'hindi' | 'telugu' | 'mixed' | 'unknow
 type FeedFilter = 'questions' | 'signals' | 'reviewed';
 type SourceModeFilter = 'all' | 'channel' | 'keyword';
 type ReviewedDateType = 'reviewed' | 'candidate';
+type ReviewedStatusFilter = 'ai_draft' | 'human_approved' | 'rejected' | 'all';
 type ReviewForm = {
   symptoms: string[];
   symptomInput: string;
@@ -136,12 +137,14 @@ export default function HomePage() {
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageFilter>('all');
   const [selectedSourceMode, setSelectedSourceMode] = useState<SourceModeFilter>('all');
   const [reviewedDateType, setReviewedDateType] = useState<ReviewedDateType>('reviewed');
+  const [reviewedStatus, setReviewedStatus] = useState<ReviewedStatusFilter>('ai_draft');
   const [minScore, setMinScore] = useState(6);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
   const [reviewForm, setReviewForm] = useState<ReviewForm>(DEFAULT_REVIEW_FORM);
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [quickReviewSavingKey, setQuickReviewSavingKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,7 +155,8 @@ export default function HomePage() {
     language = selectedLanguage,
     score = minScore,
     sourceMode = selectedSourceMode,
-    dateType = reviewedDateType
+    dateType = reviewedDateType,
+    status = reviewedStatus
   ) => {
     setLoading(true);
     setError(null);
@@ -161,7 +165,14 @@ export default function HomePage() {
     try {
       const params =
         feed === 'reviewed'
-          ? new URLSearchParams({ date, database, language, dateType, limit: '100' })
+          ? new URLSearchParams({
+              date,
+              database,
+              language,
+              dateType,
+              limit: '100',
+              ...(status === 'all' ? {} : { reviewStatus: status }),
+            })
           : new URLSearchParams({ date, feed, database, language, sourceMode, minScore: String(score) });
       const response = await fetch(
         feed === 'reviewed' ? `/api/reviewed-comments?${params.toString()}` : `/api/top-comments?${params.toString()}`
@@ -318,6 +329,33 @@ export default function HomePage() {
               </select>
             </label>
           ) : null}
+          {selectedFeed === 'reviewed' ? (
+            <label className="dateField compactField">
+              <span>Status</span>
+              <select
+                value={reviewedStatus}
+                onChange={(event) => {
+                  const nextStatus = event.target.value as ReviewedStatusFilter;
+                  setReviewedStatus(nextStatus);
+                  fetchComments(
+                    selectedDate,
+                    selectedFeed,
+                    selectedDatabase,
+                    selectedLanguage,
+                    minScore,
+                    selectedSourceMode,
+                    reviewedDateType,
+                    nextStatus
+                  );
+                }}
+              >
+                <option value="ai_draft">AI drafts</option>
+                <option value="human_approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="all">All</option>
+              </select>
+            </label>
+          ) : null}
           <div className="quickActions">
             <button type="button" onClick={() => chooseDate(getIstDateOffset(0))} disabled={loading}>
               Today
@@ -351,7 +389,7 @@ export default function HomePage() {
           <table>
             <thead>
               <tr>
-                <th>Select</th>
+                <th>{selectedFeed === 'reviewed' ? 'Decision' : 'Select'}</th>
                 <th>{selectedFeed === 'reviewed' ? 'Quality' : 'Score'}</th>
                 <th>{selectedFeed === 'reviewed' ? 'Urgency' : 'Likes'}</th>
                 <th>Source</th>
@@ -381,12 +419,41 @@ export default function HomePage() {
                     >
                       <td>
                         {selectedFeed === 'reviewed' ? (
-                          <button type="button" className="tableActionButton" onClick={(event) => {
-                            event.stopPropagation();
-                            openReview(index);
-                          }}>
-                            Edit
-                          </button>
+                          <div className="quickReviewActions">
+                            <button
+                              type="button"
+                              className="approveButton"
+                              disabled={quickReviewSavingKey === rowKey}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                quickReview(index, 'human_approved');
+                              }}
+                            >
+                              Yes
+                            </button>
+                            <button
+                              type="button"
+                              className="rejectButton"
+                              disabled={quickReviewSavingKey === rowKey}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                quickReview(index, 'rejected');
+                              }}
+                            >
+                              No
+                            </button>
+                            <button
+                              type="button"
+                              className="skipButton"
+                              disabled={quickReviewSavingKey === rowKey}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                skipReview(index);
+                              }}
+                            >
+                              Skip
+                            </button>
+                          </div>
                         ) : (
                           <input
                             aria-label="Select comment"
@@ -499,40 +566,7 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reviewedBy: 'sudhir',
-          comments: [
-            {
-              databaseName: comment.databaseName ?? comment.database,
-              database: comment.sourceDb,
-              sourceCommentId: comment.commentId ?? comment.sourceCommentId ?? String(comment.id ?? ''),
-              videoId: comment.videoId,
-              videoTitle: comment.videoTitle,
-              channelTitle: comment.channelTitle,
-              commentText: comment.text ?? comment.commentText ?? '',
-              detectedLanguage: comment.detectedLanguage,
-              candidateDate: comment.candidateDate ?? selectedDate,
-              sourcePublishedAt:
-                comment.sourcePublishedAt ??
-                comment.publishedAt ??
-                comment.fetchedAtIst ??
-                comment.fetchedAtUtc ??
-                comment.fetchedAt ??
-                comment.crawled_at,
-              symptoms: reviewForm.symptoms,
-              possibleConditions: reviewForm.possibleConditions,
-              medicalSpecialty: reviewForm.medicalSpecialty,
-              urgencyLevel: reviewForm.urgencyLevel,
-              supportingTags: reviewForm.supportingTags,
-              causalityConfidence: reviewForm.causalityConfidence,
-              labels: reviewForm.supportingTags,
-              quality: reviewForm.quality,
-              reviewNote: reviewForm.reviewNote,
-              reviewStatus: 'human_approved',
-              importBatchName:
-                selectedFeed === 'reviewed'
-                  ? comment.importBatchName ?? `gold_seed_${selectedDate}`
-                  : `${selectedFeed}_${selectedDate}`,
-            },
-          ],
+          comments: [buildReviewedPayload(comment, 'human_approved', reviewForm)],
         }),
       });
 
@@ -560,6 +594,89 @@ export default function HomePage() {
     } finally {
       setReviewSaving(false);
     }
+  }
+
+  async function quickReview(index: number, reviewStatus: 'human_approved' | 'rejected') {
+    const comment = comments[index];
+    if (!comment) {
+      return;
+    }
+
+    const rowKey = getCommentKey(comment, index);
+    setQuickReviewSavingKey(rowKey);
+    setSaveStatus(null);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/reviewed-comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewedBy: 'sudhir',
+          comments: [buildReviewedPayload(comment, reviewStatus)],
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok || payload.error) {
+        throw new Error(payload.error ?? `Server responded with ${response.status}`);
+      }
+
+      setComments((current) => current.filter((_, rowIndex) => rowIndex !== index));
+      setSaveStatus(reviewStatus === 'human_approved' ? 'Approved draft.' : 'Rejected draft.');
+    } catch (err) {
+      setError((err as Error).message || 'Unable to update draft');
+    } finally {
+      setQuickReviewSavingKey(null);
+    }
+  }
+
+  function skipReview(index: number) {
+    setComments((current) => current.filter((_, rowIndex) => rowIndex !== index));
+    setSaveStatus('Skipped draft. No database change.');
+  }
+
+  function buildReviewedPayload(
+    comment: Comment,
+    reviewStatus: 'human_approved' | 'rejected',
+    form: ReviewForm | null = null
+  ) {
+    const sourceDb = comment.sourceDb ?? comment.databaseName ?? comment.database;
+    const tags = form?.supportingTags ?? comment.supportingTags ?? [];
+
+    return {
+      databaseName: comment.databaseName ?? comment.database ?? sourceDb,
+      database: comment.database ?? sourceDb,
+      sourceCommentId: comment.sourceCommentId ?? comment.commentId ?? String(comment.id ?? ''),
+      videoId: comment.videoId,
+      videoTitle: comment.videoTitle,
+      channelTitle: comment.channelTitle,
+      commentText: comment.text ?? comment.commentText ?? '',
+      detectedLanguage: comment.detectedLanguage,
+      candidateDate: comment.candidateDate ?? selectedDate,
+      sourcePublishedAt:
+        comment.sourcePublishedAt ??
+        comment.publishedAt ??
+        comment.fetchedAtIst ??
+        comment.fetchedAtUtc ??
+        comment.fetchedAt ??
+        comment.crawled_at,
+      symptoms: form?.symptoms ?? comment.symptoms ?? [],
+      possibleConditions: form?.possibleConditions ?? comment.possibleConditions ?? [],
+      medicalSpecialty: form?.medicalSpecialty ?? comment.medicalSpecialty ?? DEFAULT_REVIEW_FORM.medicalSpecialty,
+      urgencyLevel: form?.urgencyLevel ?? comment.urgencyLevel ?? DEFAULT_REVIEW_FORM.urgencyLevel,
+      supportingTags: tags,
+      causalityConfidence:
+        form?.causalityConfidence ?? comment.causalityConfidence ?? DEFAULT_REVIEW_FORM.causalityConfidence,
+      labels: tags,
+      quality: form?.quality ?? comment.quality ?? DEFAULT_REVIEW_FORM.quality,
+      reviewNote: form?.reviewNote ?? comment.reviewNote ?? '',
+      reviewStatus,
+      importBatchName:
+        selectedFeed === 'reviewed'
+          ? comment.importBatchName ?? `gold_seed_${selectedDate}`
+          : `${selectedFeed}_${selectedDate}`,
+    };
   }
 
   async function saveSelectedComments() {

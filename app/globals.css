@@ -212,6 +212,54 @@ tbody tr:hover {
   color: #3730a3;
 }
 
+.quickReviewActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 10rem;
+}
+
+.quickReviewActions button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.42rem 0.62rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.quickReviewActions button:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
+.approveButton {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.approveButton:hover:not(:disabled) {
+  border-color: #22c55e;
+}
+
+.rejectButton {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.rejectButton:hover:not(:disabled) {
+  border-color: #ef4444;
+}
+
+.skipButton {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.skipButton:hover:not(:disabled) {
+  border-color: #9ca3af;
+}
+
 .videoTitle {
   max-width: 18rem;
   color: #374151;

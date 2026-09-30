@@ -497,6 +497,12 @@ export default function HomePage() {
           saving={reviewSaving}
           onChange={setReviewForm}
           onCancel={closeReview}
+          onReject={async () => {
+            if (reviewIndex !== null) {
+              await quickReview(reviewIndex, 'rejected');
+              closeReview();
+            }
+          }}
           onSave={() => saveReview(false)}
           onSaveNext={() => saveReview(true)}
         />
@@ -852,6 +858,7 @@ function ReviewModal({
   saving,
   onChange,
   onCancel,
+  onReject,
   onSave,
   onSaveNext,
 }: {
@@ -860,6 +867,7 @@ function ReviewModal({
   saving: boolean;
   onChange: (form: ReviewForm) => void;
   onCancel: () => void;
+  onReject: () => Promise<void>;
   onSave: () => void;
   onSaveNext: () => void;
 }) {
@@ -1031,6 +1039,9 @@ function ReviewModal({
         <footer className="modalActions">
           <button type="button" className="secondaryButton" onClick={onCancel} disabled={saving}>
             Cancel
+          </button>
+          <button type="button" className="rejectModalButton" onClick={onReject} disabled={saving}>
+            {saving ? 'Rejecting...' : 'Reject & Close'}
           </button>
           <button type="button" className="secondaryButton" onClick={onSaveNext} disabled={saving}>
             Save & Next

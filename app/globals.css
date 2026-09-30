@@ -504,3 +504,5 @@ tbody tr:hover {
     flex-direction: column-reverse;
   }
 }
+.rejectModalButton { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.rejectModalButton:hover:not(:disabled) { border-color: #ef4444; }
